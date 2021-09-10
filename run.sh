@@ -1,1 +1,1 @@
-gunicorn main:api
+gunicorn -b 0.0.0.0 --workers=10 -k sync main:api
