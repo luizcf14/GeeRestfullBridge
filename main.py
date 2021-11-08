@@ -111,13 +111,21 @@ class getImageList:
         resp.status = falcon.HTTP_200 
         print(req.params)
         polygon = json.loads(req.get_param('polygon',False)  or req.params['polygon'])  #get via GET or POST
+        satellite = json.loads(req.get_param('satellite',False)  or req.params['satellite'])
         if(polygon != ''):
             self.geeGeometry = ee.Geometry.MultiPolygon(polygon['coordinates'],'EPSG:4326',True)
             self.featureArea = ee.Number(self.geeGeometry.area()).sqrt().getInfo()
-            landsatListL8 = self.landsat8.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
-            landsatListS2 = self.sentinel2.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
-            landsatListS1 = self.sentinel1.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
-            landsatList = [*landsatListL8,*landsatListS2,*landsatListS1]
+            if('All' in satellite):
+                landsatListL8 = self.landsat8.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
+                landsatListS2 = self.sentinel2.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
+                landsatListS1 = self.sentinel1.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
+                landsatList = [*landsatListL8,*landsatListS2,*landsatListS1]
+            if('L8' in satellite):
+                 landsatList = self.landsat8.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
+            if('S2' in satellite):
+                landsatList = self.sentinel2.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
+            if('S1' in satellite):
+                landsatList = self.sentinel1.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
             #landsatList = list(map(self.imageToThumb,landsatList))
             resp.media = landsatList
         else:
