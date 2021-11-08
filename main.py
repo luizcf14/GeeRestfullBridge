@@ -37,12 +37,12 @@ class getThumbs:
             eeimg = eeimg.normalizedDifference(['nir','red']).rename('NDVI')
         else:
             if(imageBands == 'red,green,blue'):
+                eeMin = 0.05
+                eeMax = 0.12
                 if("S2" in img):
                     # print("S2")
                     eeMin = 210
                     eeMax = 2140
-                eeMin = 0.05
-                eeMax = 0.12
             imageBands = imageBands.split(',')
         if("S1_GRD" in img):
             # print("S1")
@@ -111,7 +111,8 @@ class getImageList:
         resp.status = falcon.HTTP_200 
         print(req.params)
         polygon = json.loads(req.get_param('polygon',False)  or req.params['polygon'])  #get via GET or POST
-        satellite = json.loads(req.get_param('satellite',False)  or req.params['satellite'])
+        satellite = req.get_param('satellite',False)  or req.params['satellite']
+        print(satellite)
         if(polygon != ''):
             self.geeGeometry = ee.Geometry.MultiPolygon(polygon['coordinates'],'EPSG:4326',True)
             self.featureArea = ee.Number(self.geeGeometry.area()).sqrt().getInfo()
