@@ -21,18 +21,19 @@ class getThumbs:
         eeMax = 0.55
         gain = None
         gama = 1
+        sat = 'L8'
         if("LANDSAT" in img):
-            print('L8')
+            sat = 'L8'
             eeimg = ee.Image(img).select([1,2,3,4,5,6,'BQA'],['blue','green','red','nir','swir1','swir2','BQA'])
             gain = None
             gama = 1.15
         if("S2_SR" in img):
-            print('S2')
+            sat = 'S2'
             eeimg = ee.Image(img).select([1,2,3,8,11,12],['blue','green','red','nir','swir1','swir2'])
             gain = None
             gama = 0.80
         if("S1_GRD" in img):
-            print('S1')
+            sat = 'S1'
             eeimg = ee.Image(img).select(['VH','VH','VH','VH','VH','VH'],['blue','green','red','nir','swir1','swir2'])
         if("S2" in img):
             # print("S2")
@@ -94,7 +95,7 @@ class getThumbs:
         date = ee.Image(img).get('DATE_ACQUIRED').getInfo()
         if("COPERNICUS" in img):
             date = datetime.fromtimestamp(ee.Image(img).get('system:time_start').getInfo()/1000).strftime("%Y-%m-%d")   
-        return {'order':imageOrder,'thumb' : imageThumb, 'tile' : mapid['tile_fetcher'].url_format, 'imgID':img,'date':date}
+        return {'order':imageOrder,'thumb' : imageThumb, 'tile' : mapid['tile_fetcher'].url_format, 'imgID':img,'date':date,'imgSat':sat}
 
     def on_post(self, req, resp):
         imageName = req.get_param('image',False)
@@ -139,10 +140,11 @@ class getImageList:
             self.geeGeometry = ee.Geometry.MultiPolygon(polygon['coordinates'],'EPSG:4326',True)
             self.featureArea = ee.Number(self.geeGeometry.area()).sqrt().getInfo()
             if('All' in satellite):
-                landsatListL8 = self.landsat8.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(30,'system:time_end',False).aggregate_array('system:id').getInfo()
-                landsatListS2 = self.sentinel2.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(30,'system:time_end',False).aggregate_array('system:id').getInfo()
-                landsatListS1 = self.sentinel1.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(30,'system:time_end',False).aggregate_array('system:id').getInfo()
-                landsatList = [*landsatListL8,*landsatListS2,*landsatListS1]
+                landsatListL8 = self.landsat8.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(30,'system:time_end',False) #.aggregate_array('system:id').getInfo()
+                landsatListS2 = self.sentinel2.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(30,'system:time_end',False)#.aggregate_array('system:id').getInfo()
+                landsatListS1 = self.sentinel1.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(30,'system:time_end',False)#.aggregate_array('system:id').getInfo()
+                landsatList = landsatListL8.merge(landsatListS1).merge(landsatListS2).limit(300,'system:time_end',False).aggregate_array('system:id').getInfo()
+                #landsatList = [*landsatListL8,*landsatListS2,*landsatListS1]
             if('L8' in satellite):
                  landsatList = self.landsat8.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(100,'system:time_end',False).aggregate_array('system:id').getInfo()
             if('S2' in satellite):
