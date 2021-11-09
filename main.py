@@ -1,7 +1,9 @@
 import falcon
 from wsgiref.simple_server import make_server
 import ee
-import datetime
+
+from datetime import datetime,timedelta
+import time
 import ast
 from pyasn1.type.univ import Null
 import wget
@@ -17,10 +19,15 @@ class getThumbs:
     def imageToThumb(self,img,imageBands,imageOrder):
         eeMin = 0.03
         eeMax = 0.4
+        gain = None
+        gama = None
         if("LANDSAT" in img):
             eeimg = ee.Image(img).select([1,2,3,4,5,6,'BQA'],['blue','green','red','nir','swir1','swir2','BQA'])
+            gain = [3, 2.5, 6.5]
+            gama = 0.85
         if("S2_SR" in img):
             eeimg = ee.Image(img).select([1,2,3,8,11,12],['blue','green','red','nir','swir1','swir2'])
+            gain = [0.08, 0.07, 0.2]
         if("S1_GRD" in img):
             eeimg = ee.Image(img).select(['VH','VH','VH','VH','VH','VH'],['blue','green','red','nir','swir1','swir2'])
         if("S2" in img):
@@ -60,7 +67,8 @@ class getThumbs:
         if(self.featureArea < 800):
             self.featureArea = self.featureArea * 1.5
         #print('Area'+str(self.featureArea));
-        imageThumb = eeimg.visualize(imageBands,None,None,eeMin,eeMax).blend(imageGeom)
+        
+        imageThumb = eeimg.visualize(imageBands,gain,None,eeMin,eeMax,gama).blend(imageGeom)
         imageThumb = imageThumb.getThumbURL({
             'name':img,
             'bands':['vis-red','vis-green','vis-blue'],#imageBands,
@@ -74,7 +82,7 @@ class getThumbs:
         mapid = eeimg.getMapId({'bands': imageBands, 'min': eeMin, 'max': eeMax})
         date = ee.Image(img).get('DATE_ACQUIRED').getInfo()
         if("COPERNICUS" in img):
-            date = datetime.datetime.fromtimestamp(ee.Image(img).get('system:time_start').getInfo()/1000).strftime("%Y-%m-%d")   
+            date = datetime.fromtimestamp(ee.Image(img).get('system:time_start').getInfo()/1000).strftime("%Y-%m-%d")   
         return {'order':imageOrder,'thumb' : imageThumb, 'tile' : mapid['tile_fetcher'].url_format, 'imgID':img,'date':date}
 
     def on_post(self, req, resp):
@@ -112,21 +120,24 @@ class getImageList:
         print(req.params)
         polygon = json.loads(req.get_param('polygon',False)  or req.params['polygon'])  #get via GET or POST
         satellite = req.get_param('satellite',False)  or req.params['satellite']
-        print(satellite)
+        dateAfter = req.get_param('date',False)  or req.params['date']
+        dateBefore = (datetime.fromisoformat(dateAfter[:-1])  - timedelta(days=(1.5*365))).strftime("%Y-%m-%d")   
+        dateAfter = (datetime.fromisoformat(dateAfter[:-1]) + timedelta(days=(60))).strftime("%Y-%m-%d")
+        
         if(polygon != ''):
             self.geeGeometry = ee.Geometry.MultiPolygon(polygon['coordinates'],'EPSG:4326',True)
             self.featureArea = ee.Number(self.geeGeometry.area()).sqrt().getInfo()
             if('All' in satellite):
-                landsatListL8 = self.landsat8.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
-                landsatListS2 = self.sentinel2.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
-                landsatListS1 = self.sentinel1.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
+                landsatListL8 = self.landsat8.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(30,'system:time_end',False).aggregate_array('system:id').getInfo()
+                landsatListS2 = self.sentinel2.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(30,'system:time_end',False).aggregate_array('system:id').getInfo()
+                landsatListS1 = self.sentinel1.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(30,'system:time_end',False).aggregate_array('system:id').getInfo()
                 landsatList = [*landsatListL8,*landsatListS2,*landsatListS1]
             if('L8' in satellite):
-                 landsatList = self.landsat8.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
+                 landsatList = self.landsat8.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(100,'system:time_end',False).aggregate_array('system:id').getInfo()
             if('S2' in satellite):
-                landsatList = self.sentinel2.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
+                landsatList = self.sentinel2.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(100,'system:time_end',False).aggregate_array('system:id').getInfo()
             if('S1' in satellite):
-                landsatList = self.sentinel1.filterDate('2019-01-01','2030-01-01').filterBounds(self.geeGeometry).limit(25,'system:time_end',False).aggregate_array('system:id').getInfo()
+                landsatList = self.sentinel1.filterDate(dateBefore,dateAfter).filterBounds(self.geeGeometry).limit(100,'system:time_end',False).aggregate_array('system:id').getInfo()
             #landsatList = list(map(self.imageToThumb,landsatList))
             resp.media = landsatList
         else:
