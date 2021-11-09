@@ -17,39 +17,47 @@ class getThumbs:
     geeGeometry = ''
     featureArea = 0
     def imageToThumb(self,img,imageBands,imageOrder):
-        eeMin = 0.03
-        eeMax = 0.4
+        eeMin = 0.02
+        eeMax = 0.55
         gain = None
-        gama = None
+        gama = 1
         if("LANDSAT" in img):
+            print('L8')
             eeimg = ee.Image(img).select([1,2,3,4,5,6,'BQA'],['blue','green','red','nir','swir1','swir2','BQA'])
-            gain = [3, 2.5, 6.5]
-            gama = 0.85
+            gain = None
+            gama = 1.15
         if("S2_SR" in img):
+            print('S2')
             eeimg = ee.Image(img).select([1,2,3,8,11,12],['blue','green','red','nir','swir1','swir2'])
-            gain = [0.08, 0.07, 0.2]
+            gain = None
+            gama = 0.80
         if("S1_GRD" in img):
+            print('S1')
             eeimg = ee.Image(img).select(['VH','VH','VH','VH','VH','VH'],['blue','green','red','nir','swir1','swir2'])
         if("S2" in img):
             # print("S2")
-            eeMin = 91
-            eeMax = 3700
+            eeMin = 0
+            eeMax = 5000
         if(imageBands == 'ndvi,' and "S1_GRD" not in img):
             eeMin = 0.1
-            eeMax = 0.9
+            eeMax = 0.8
+            gain = None
+            gama = 1
             if("S2_SR" in img):
+                gain = None
+                gama = 1
                 eeMin = -0.15
                 eeMax = 0.9
             imageBands = ['NDVI']
             eeimg = eeimg.normalizedDifference(['nir','red']).rename('NDVI')
         else:
             if(imageBands == 'red,green,blue'):
-                eeMin = 0.05
-                eeMax = 0.12
+                eeMin = 0.04
+                eeMax = 0.25
                 if("S2" in img):
                     # print("S2")
-                    eeMin = 210
-                    eeMax = 2140
+                    eeMin = 415
+                    eeMax = 1374
             imageBands = imageBands.split(',')
         if("S1_GRD" in img):
             # print("S1")
@@ -67,7 +75,10 @@ class getThumbs:
         if(self.featureArea < 800):
             self.featureArea = self.featureArea * 1.5
         #print('Area'+str(self.featureArea));
-        
+        print(eeMin)
+        print(eeMax)
+        print(gain)
+        print(gama)
         imageThumb = eeimg.visualize(imageBands,gain,None,eeMin,eeMax,gama).blend(imageGeom)
         imageThumb = imageThumb.getThumbURL({
             'name':img,
@@ -79,7 +90,7 @@ class getThumbs:
             'format':'png'
         })
 
-        mapid = eeimg.getMapId({'bands': imageBands, 'min': eeMin, 'max': eeMax})
+        mapid = eeimg.getMapId({'bands': imageBands, 'min': eeMin, 'max': eeMax,'gain':gain,'gamma':gama})
         date = ee.Image(img).get('DATE_ACQUIRED').getInfo()
         if("COPERNICUS" in img):
             date = datetime.fromtimestamp(ee.Image(img).get('system:time_start').getInfo()/1000).strftime("%Y-%m-%d")   
